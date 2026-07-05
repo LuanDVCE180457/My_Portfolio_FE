@@ -33,6 +33,7 @@ export default function HomePage() {
   const [playerPos, setPlayerPos] = useState({ x: 380, y: 280 });
   const [activeZone, setActiveZone] = useState<Zone | null>(null);
   const [openedModal, setOpenedModal] = useState<ZoneId>(null);
+  const [scale, setScale] = useState(1);
 
   // Use refs for mutable values that shouldn't trigger re-renders in the loop
   const posRef = useRef({ x: 380, y: 280 });
@@ -45,6 +46,19 @@ export default function HomePage() {
       setCvData(data);
       setLoading(false);
     });
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      // Scale down if screen is smaller than 800px (with some margin)
+      const availableWidth = Math.min(window.innerWidth * 0.95, GAME_WIDTH);
+      setScale(availableWidth / GAME_WIDTH);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Init scale
+
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -80,6 +94,20 @@ export default function HomePage() {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
+
+  // Mobile Touch Handlers
+  const handleTouchStart = (key: string) => {
+    keys.current[key] = true;
+    if (key === 'enter') {
+      if (!modalOpenRef.current && activeZoneRef.current) {
+        setOpenedModal(activeZoneRef.current.id);
+      }
+    }
+  };
+
+  const handleTouchEnd = (key: string) => {
+    keys.current[key] = false;
+  };
 
   // Game Loop
   useEffect(() => {
@@ -233,25 +261,50 @@ export default function HomePage() {
         <p className="controls-hint">Use <strong>W A S D</strong> or <strong>Arrows</strong> to move. Walk to a zone and press <strong>E</strong> or <strong>Enter</strong> to interact.</p>
       </div>
 
-      <div className="game-world">
-        {ZONES.map(zone => (
-          <div
-            key={zone.id}
-            className={`zone-sprite zone-${zone.id}`}
-            style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}
-          >
-            {zone.label}
-          </div>
-        ))}
-
-        <div
-          className="player-sprite"
-          style={{ transform: `translate(${playerPos.x}px, ${playerPos.y}px)` }}
+      <div 
+        className="game-world-wrapper" 
+        style={{ width: GAME_WIDTH * scale, height: GAME_HEIGHT * scale, position: 'relative' }}
+      >
+        <div 
+          className="game-world"
+          style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
         >
-          {activeZone && (
-            <div className="interaction-prompt">Press E</div>
-          )}
+          {ZONES.map(zone => (
+            <div
+              key={zone.id}
+              className={`zone-sprite zone-${zone.id}`}
+              style={{
+                left: zone.x,
+                top: zone.y,
+                width: zone.w,
+                height: zone.h
+              }}
+            >
+              {zone.label}
+            </div>
+          ))}
+
+          <div
+            className="player-sprite"
+            style={{
+              transform: `translate(${playerPos.x}px, ${playerPos.y}px)`
+            }}
+          >
+            {activeZone && (
+              <div className="interaction-prompt">Press E</div>
+            )}
+          </div>
         </div>
+      </div>
+
+      <div className="mobile-controls">
+        <div className="d-pad">
+          <button className="control-btn d-up" onTouchStart={() => handleTouchStart('w')} onTouchEnd={() => handleTouchEnd('w')} onMouseDown={() => handleTouchStart('w')} onMouseUp={() => handleTouchEnd('w')}>↑</button>
+          <button className="control-btn d-left" onTouchStart={() => handleTouchStart('a')} onTouchEnd={() => handleTouchEnd('a')} onMouseDown={() => handleTouchStart('a')} onMouseUp={() => handleTouchEnd('a')}>←</button>
+          <button className="control-btn d-down" onTouchStart={() => handleTouchStart('s')} onTouchEnd={() => handleTouchEnd('s')} onMouseDown={() => handleTouchStart('s')} onMouseUp={() => handleTouchEnd('s')}>↓</button>
+          <button className="control-btn d-right" onTouchStart={() => handleTouchStart('d')} onTouchEnd={() => handleTouchEnd('d')} onMouseDown={() => handleTouchStart('d')} onMouseUp={() => handleTouchEnd('d')}>→</button>
+        </div>
+        <button className="control-btn action-btn" onTouchStart={() => handleTouchStart('enter')} onTouchEnd={() => handleTouchEnd('enter')} onMouseDown={() => handleTouchStart('enter')} onMouseUp={() => handleTouchEnd('enter')}>E</button>
       </div>
 
       {openedModal && (

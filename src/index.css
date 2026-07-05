@@ -57,11 +57,71 @@ html, body, #root {
   border: var(--pixel-border);
   box-shadow: 8px 8px 0px #000;
   overflow: hidden;
-  /* Add a pixel grid texture */
   background-image: 
     linear-gradient(rgba(0,0,0,0.05) 2px, transparent 2px),
     linear-gradient(90deg, rgba(0,0,0,0.05) 2px, transparent 2px);
   background-size: 40px 40px;
+}
+
+/* Mobile Controls */
+.mobile-controls {
+  display: none;
+  width: 100%;
+  max-width: 800px;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 20px;
+  margin-top: 10px;
+}
+
+.d-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 50px);
+  grid-template-rows: repeat(3, 50px);
+  gap: 5px;
+}
+
+.control-btn {
+  background-color: #fff;
+  border: 4px solid #000;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 4px 4px 0 #000;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.control-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
+}
+
+.d-up { grid-column: 2; grid-row: 1; }
+.d-left { grid-column: 1; grid-row: 2; }
+.d-down { grid-column: 2; grid-row: 3; }
+.d-right { grid-column: 3; grid-row: 2; }
+
+.action-btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background-color: #e74c3c;
+  color: white;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .mobile-controls {
+    display: flex;
+  }
+  .game-header h1 {
+    font-size: 2rem;
+  }
 }
 
 .player-sprite {
