@@ -4,19 +4,20 @@ import type { Project } from './project';
 export interface Profile {
   name: string;
   roleClass: string;
+  phone: string;
   dob: string;
+  gender: string;
   location: string;
   education: string;
   bio: string;
+  awards: string[];
   avatarUrl: string;
   email: string;
   githubUrl: string;
-  linkedinUrl: string;
 }
 
 export interface SkillItem {
   name: string;
-  level: number;
 }
 
 export interface SkillGroup {

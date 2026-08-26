@@ -1,53 +1,113 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cvData } from '../data/cvData';
 
-// Constants for game world
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
-const PLAYER_SIZE = 40;
+const PLAYER_SIZE = 36;
 const SPEED = 4;
 
-type ZoneId = 'profile' | 'skills' | 'experience' | 'projects' | null;
+type ZoneId = 'profile' | 'skills' | 'experience' | 'projects';
+type ModalId = ZoneId | 'portal' | null;
 
 interface Zone {
-  id: NonNullable<ZoneId>;
+  id: ZoneId;
   x: number;
   y: number;
   w: number;
   h: number;
   label: string;
+  code: string;
+}
+
+interface Shard {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
 }
 
 const ZONES: Zone[] = [
-  { id: 'profile', x: 100, y: 100, w: 100, h: 100, label: 'Profile' },
-  { id: 'skills', x: 600, y: 100, w: 100, h: 100, label: 'Skills' },
-  { id: 'experience', x: 100, y: 400, w: 100, h: 100, label: 'Experience' },
-  { id: 'projects', x: 600, y: 400, w: 100, h: 100, label: 'Projects' },
+  { id: 'profile', x: 50, y: 28, w: 230, h: 195, label: 'Identity Archive', code: '01' },
+  { id: 'skills', x: 520, y: 28, w: 230, h: 195, label: 'Skill Forge', code: '02' },
+  { id: 'experience', x: 40, y: 355, w: 245, h: 210, label: 'Quest Records', code: '03' },
+  { id: 'projects', x: 510, y: 350, w: 250, h: 215, label: 'Build Vault', code: '04' },
 ];
 
+const SHARDS: Shard[] = [
+  { id: 'unity', label: 'Unity', x: 374, y: 64 },
+  { id: 'fusion', label: 'Fusion', x: 266, y: 275 },
+  { id: 'dotnet', label: '.NET', x: 505, y: 275 },
+  { id: 'git', label: 'Git', x: 374, y: 496 },
+  { id: 'ai', label: 'AI', x: 374, y: 172 },
+];
+
+const PORTAL = { x: 338, y: 238, w: 124, h: 124 };
+
 export default function HomePage() {
-  // Game state
-  const [playerPos, setPlayerPos] = useState({ x: 380, y: 280 });
+  const [playerPos, setPlayerPos] = useState({ x: 382, y: 340 });
+  const [facing, setFacing] = useState<'left' | 'right'>('right');
+  const [moving, setMoving] = useState(false);
   const [activeZone, setActiveZone] = useState<Zone | null>(null);
-  const [openedModal, setOpenedModal] = useState<ZoneId>(null);
+  const [nearPortal, setNearPortal] = useState(false);
+  const [openedModal, setOpenedModal] = useState<ModalId>(null);
+  const [collectedShardIds, setCollectedShardIds] = useState<string[]>([]);
+  const [visitedZoneIds, setVisitedZoneIds] = useState<ZoneId[]>([]);
+  const [notice, setNotice] = useState('SIGNAL FOUND: RECOVER THE DATA SHARDS');
   const [scale, setScale] = useState(1);
 
-  // Use refs for mutable values that shouldn't trigger re-renders in the loop
-  const posRef = useRef({ x: 380, y: 280 });
-  const keys = useRef<{ [key: string]: boolean }>({});
+  const posRef = useRef({ x: 382, y: 340 });
+  const keys = useRef<Record<string, boolean>>({});
   const modalOpenRef = useRef(false);
   const activeZoneRef = useRef<Zone | null>(null);
+  const nearPortalRef = useRef(false);
+  const collectedRef = useRef(new Set<string>());
+  const noticeTimerRef = useRef<number | null>(null);
+
+  const portalUnlocked = collectedShardIds.length === SHARDS.length;
+
+  const showNotice = useCallback((message: string) => {
+    setNotice(message);
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+    noticeTimerRef.current = window.setTimeout(() => {
+      setNotice('EXPLORE THE ARCHIVES. THE PORTAL IS WAITING.');
+    }, 2400);
+  }, []);
+
+  const openZone = useCallback((id: ZoneId) => {
+    setOpenedModal(id);
+    setVisitedZoneIds((current) => current.includes(id) ? current : [...current, id]);
+  }, []);
+
+  const interact = useCallback(() => {
+    if (modalOpenRef.current) return;
+
+    if (activeZoneRef.current) {
+      openZone(activeZoneRef.current.id);
+      return;
+    }
+
+    if (nearPortalRef.current) {
+      if (collectedRef.current.size === SHARDS.length) {
+        setOpenedModal('portal');
+      } else {
+        showNotice(`PORTAL LOCKED: ${SHARDS.length - collectedRef.current.size} SHARDS MISSING`);
+      }
+    }
+  }, [openZone, showNotice]);
 
   useEffect(() => {
     const handleResize = () => {
-      // Scale down if screen is smaller than 800px (with some margin)
-      const availableWidth = Math.min(window.innerWidth * 0.95, GAME_WIDTH);
-      setScale(availableWidth / GAME_WIDTH);
+      const desktop = window.innerWidth >= 1080;
+      const availableWidth = desktop ? window.innerWidth - 354 : window.innerWidth - 24;
+      const widthScale = Math.min(availableWidth / GAME_WIDTH, 1);
+      const heightScale = desktop ? Math.min((window.innerHeight - 168) / GAME_HEIGHT, 1) : 1;
+      setScale(Math.max(0.36, Math.min(widthScale, heightScale)));
     };
 
     window.addEventListener('resize', handleResize);
-    handleResize(); // Init scale
-
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -56,122 +116,176 @@ export default function HomePage() {
   }, [openedModal]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      keys.current[e.key.toLowerCase()] = true;
-      
-      // Interaction
-      if (e.key === 'Enter' || e.key.toLowerCase() === 'e') {
-        if (!modalOpenRef.current && activeZoneRef.current) {
-          setOpenedModal(activeZoneRef.current.id);
-        }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'enter'].includes(key)) {
+        event.preventDefault();
       }
-      
-      // Close modal
-      if (e.key === 'Escape') {
-        setOpenedModal(null);
-      }
+      keys.current[key] = true;
+
+      if (key === 'e' || key === 'enter' || key === ' ') interact();
+      if (key === 'escape') setOpenedModal(null);
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keys.current[e.key.toLowerCase()] = false;
+    const handleKeyUp = (event: KeyboardEvent) => {
+      keys.current[event.key.toLowerCase()] = false;
+    };
+
+    const clearKeys = () => {
+      keys.current = {};
+      setMoving(false);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-
+    window.addEventListener('blur', clearKeys);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', clearKeys);
     };
+  }, [interact]);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
   }, []);
 
-  // Mobile Touch Handlers
-  const handleTouchStart = (key: string) => {
-    keys.current[key] = true;
-    if (key === 'enter') {
-      if (!modalOpenRef.current && activeZoneRef.current) {
-        setOpenedModal(activeZoneRef.current.id);
-      }
-    }
+  const setControl = (key: string, pressed: boolean) => {
+    keys.current[key] = pressed;
+    if (pressed && key === 'interact') interact();
   };
 
-  const handleTouchEnd = (key: string) => {
-    keys.current[key] = false;
-  };
-
-  // Game Loop
   useEffect(() => {
     let animationFrameId: number;
 
     const gameLoop = () => {
-      // Stop moving if modal is open
       if (!modalOpenRef.current) {
         let dx = 0;
         let dy = 0;
+        if (keys.current.w || keys.current.arrowup) dy -= SPEED;
+        if (keys.current.s || keys.current.arrowdown) dy += SPEED;
+        if (keys.current.a || keys.current.arrowleft) dx -= SPEED;
+        if (keys.current.d || keys.current.arrowright) dx += SPEED;
 
-        if (keys.current['w'] || keys.current['arrowup']) dy -= SPEED;
-        if (keys.current['s'] || keys.current['arrowdown']) dy += SPEED;
-        if (keys.current['a'] || keys.current['arrowleft']) dx -= SPEED;
-        if (keys.current['d'] || keys.current['arrowright']) dx += SPEED;
+        const isMoving = dx !== 0 || dy !== 0;
+        setMoving((current) => current === isMoving ? current : isMoving);
 
-        if (dx !== 0 || dy !== 0) {
-          let newX = posRef.current.x + dx;
-          let newY = posRef.current.y + dy;
-
-          // Boundaries
-          if (newX < 0) newX = 0;
-          if (newY < 0) newY = 0;
-          if (newX > GAME_WIDTH - PLAYER_SIZE) newX = GAME_WIDTH - PLAYER_SIZE;
-          if (newY > GAME_HEIGHT - PLAYER_SIZE) newY = GAME_HEIGHT - PLAYER_SIZE;
+        if (isMoving) {
+          if (dx !== 0) setFacing(dx < 0 ? 'left' : 'right');
+          const diagonalFactor = dx !== 0 && dy !== 0 ? Math.SQRT1_2 : 1;
+          const newX = Math.max(8, Math.min(GAME_WIDTH - PLAYER_SIZE - 8, posRef.current.x + dx * diagonalFactor));
+          const newY = Math.max(8, Math.min(GAME_HEIGHT - PLAYER_SIZE - 8, posRef.current.y + dy * diagonalFactor));
 
           posRef.current = { x: newX, y: newY };
           setPlayerPos({ x: newX, y: newY });
 
-          // Collision check
-          let currentZone: Zone | null = null;
-          for (const zone of ZONES) {
-            // Simple AABB collision
-            if (
-              newX < zone.x + zone.w &&
-              newX + PLAYER_SIZE > zone.x &&
-              newY < zone.y + zone.h &&
-              newY + PLAYER_SIZE > zone.y
-            ) {
-              currentZone = zone;
-              break;
-            }
-          }
+          const playerCenterX = newX + PLAYER_SIZE / 2;
+          const playerCenterY = newY + PLAYER_SIZE / 2;
+          const currentZone = ZONES.find((zone) => {
+            const normalizedX = (playerCenterX - (zone.x + zone.w / 2)) / (zone.w / 2);
+            const normalizedY = (playerCenterY - (zone.y + zone.h / 2)) / (zone.h / 2);
+            return normalizedX ** 2 + normalizedY ** 2 <= 1;
+          }) ?? null;
 
-          if (currentZone !== activeZoneRef.current) {
+          if (currentZone?.id !== activeZoneRef.current?.id) {
             activeZoneRef.current = currentZone;
             setActiveZone(currentZone);
           }
+
+          const portalCollision = (
+            newX < PORTAL.x + PORTAL.w &&
+            newX + PLAYER_SIZE > PORTAL.x &&
+            newY < PORTAL.y + PORTAL.h &&
+            newY + PLAYER_SIZE > PORTAL.y
+          );
+          if (portalCollision !== nearPortalRef.current) {
+            nearPortalRef.current = portalCollision;
+            setNearPortal(portalCollision);
+          }
+
+          for (const shard of SHARDS) {
+            if (collectedRef.current.has(shard.id)) continue;
+            const shardCollision = (
+              newX < shard.x + 28 &&
+              newX + PLAYER_SIZE > shard.x &&
+              newY < shard.y + 28 &&
+              newY + PLAYER_SIZE > shard.y
+            );
+
+            if (shardCollision) {
+              collectedRef.current.add(shard.id);
+              setCollectedShardIds(Array.from(collectedRef.current));
+              const remaining = SHARDS.length - collectedRef.current.size;
+              showNotice(remaining === 0 ? 'ALL SHARDS RECOVERED: PORTAL ONLINE' : `${shard.label.toUpperCase()} SHARD RECOVERED: ${remaining} REMAIN`);
+            }
+          }
         }
       }
-      animationFrameId = requestAnimationFrame(gameLoop);
+
+      animationFrameId = window.requestAnimationFrame(gameLoop);
     };
 
-    animationFrameId = requestAnimationFrame(gameLoop);
+    animationFrameId = window.requestAnimationFrame(gameLoop);
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [showNotice]);
 
-    return () => cancelAnimationFrame(animationFrameId);
-  }, []);
+  const resetGame = () => {
+    const start = { x: 382, y: 340 };
+    posRef.current = start;
+    collectedRef.current = new Set();
+    activeZoneRef.current = null;
+    nearPortalRef.current = false;
+    keys.current = {};
+    setPlayerPos(start);
+    setCollectedShardIds([]);
+    setVisitedZoneIds([]);
+    setActiveZone(null);
+    setNearPortal(false);
+    setOpenedModal(null);
+    setNotice('SIGNAL RESET: RECOVER THE DATA SHARDS');
+  };
 
-  // Modals Content
   const renderModalContent = () => {
     if (!openedModal) return null;
+
+    if (openedModal === 'portal') {
+      return (
+        <div className="ending-panel">
+          <span className="modal-kicker">RECRUITER CACHE // ACCESS GRANTED</span>
+          <h2>Quest Complete</h2>
+          <p className="ending-lead">You found the developer behind the build.</p>
+          <div className="ending-snapshot">
+            <span>UNITY</span><span>PHOTON FUSION</span><span>.NET 8</span><span>REMOTE READY</span>
+          </div>
+          <p>{cvData.profile.name} is available for Unity Game Developer and Junior Game Developer opportunities.</p>
+          <div className="modal-actions">
+            <a href={`mailto:${cvData.profile.email}`}>SEND MESSAGE</a>
+            <a href={`tel:${cvData.profile.phone}`}>CALL PLAYER</a>
+          </div>
+        </div>
+      );
+    }
 
     if (openedModal === 'profile') {
       const { profile } = cvData;
       return (
         <div>
+          <span className="modal-kicker">ARCHIVE 01 // IDENTITY</span>
           <h2>Player Profile</h2>
-          <div className="info-row"><span className="info-label">Name:</span> <span className="info-value">{profile.name}</span></div>
-          <div className="info-row"><span className="info-label">Date of Birth:</span> <span className="info-value">{profile.dob}</span></div>
-          <div className="info-row"><span className="info-label">Class:</span> <span className="info-value">{profile.roleClass}</span></div>
-          <div className="info-row"><span className="info-label">Bio:</span> <span className="info-value">{profile.bio}</span></div>
-          <div className="info-row"><span className="info-label">Education:</span> <span className="info-value">{profile.education}</span></div>
-          <div className="info-row"><span className="info-label">Email:</span> <span className="info-value">{profile.email}</span></div>
-          <div className="info-row"><span className="info-label">Location:</span> <span className="info-value">{profile.location}</span></div>
+          <div className="profile-summary">
+            <div className="profile-avatar" aria-hidden="true">DL</div>
+            <div><strong>{profile.name}</strong><span>{profile.roleClass}</span></div>
+          </div>
+          <div className="info-grid">
+            <div className="info-row"><span className="info-label">Phone</span><a className="info-value" href={`tel:${profile.phone}`}>{profile.phone}</a></div>
+            <div className="info-row"><span className="info-label">Email</span><a className="info-value" href={`mailto:${profile.email}`}>{profile.email}</a></div>
+            <div className="info-row"><span className="info-label">Location</span><span className="info-value">{profile.location}</span></div>
+            <div className="info-row"><span className="info-label">Born</span><span className="info-value">{profile.dob}</span></div>
+          </div>
+          <div className="info-row"><span className="info-label">Objective</span><span className="info-value">{profile.bio}</span></div>
+          <div className="info-row"><span className="info-label">Education</span><span className="info-value">{profile.education}</span></div>
+          <div className="info-row"><span className="info-label">Award</span><span className="info-value">{profile.awards.join(', ')}</span></div>
+          <a className="text-link" href={profile.githubUrl} target="_blank" rel="noreferrer">OPEN GITHUB PROFILE</a>
         </div>
       );
     }
@@ -179,20 +293,16 @@ export default function HomePage() {
     if (openedModal === 'skills') {
       return (
         <div>
-          <h2>Tech Stats</h2>
-          {cvData.skills.map((categoryGroup) => (
-            <div key={categoryGroup.category} className="card">
-              <h3>{categoryGroup.category}</h3>
-              {categoryGroup.items.map((skill) => (
-                <div key={skill.name} className="info-row" style={{ marginTop: '10px' }}>
-                  <span className="info-label" style={{ fontSize: '1.2rem' }}>{skill.name}</span>
-                  <div className="skill-item__bar" style={{ marginTop: '5px' }}>
-                    <span style={{ width: `${skill.level}%` }}></span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
+          <span className="modal-kicker">ARCHIVE 02 // LOADOUT</span>
+          <h2>Technical Arsenal</h2>
+          <div className="skill-grid">
+            {cvData.skills.map((group) => (
+              <section key={group.category} className="skill-group">
+                <h3>{group.category}</h3>
+                <div>{group.items.map((skill) => <span key={skill.name} className="tag">{skill.name}</span>)}</div>
+              </section>
+            ))}
+          </div>
         </div>
       );
     }
@@ -200,105 +310,137 @@ export default function HomePage() {
     if (openedModal === 'experience') {
       return (
         <div>
-          <h2>Quest Log (Experience)</h2>
-          {cvData.experiences.map((exp) => (
-            <div key={exp.id} className="card">
-              <h3>{exp.position}</h3>
-              <h4>{exp.company}</h4>
-              <p><strong>Duration:</strong> {new Date(exp.startDate).toLocaleDateString('en-GB')} - {exp.isCurrent || !exp.endDate ? 'Present' : new Date(exp.endDate).toLocaleDateString('en-GB')}</p>
-              <p>{exp.description}</p>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (openedModal === 'projects') {
-      return (
-        <div>
-          <h2>Inventory (Projects)</h2>
-          {cvData.projects.map((proj) => (
-            <div key={proj.id} className="card">
-              <h3>{proj.title}</h3>
-              <p><strong>Description:</strong> {proj.description}</p>
-              {proj.role && <p><strong>Role:</strong> {proj.role}</p>}
-              <div style={{ marginTop: '10px' }}>
-                {proj.techStack?.map((t: string) => (
-                  <span key={t} className="tag">{t}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  return (
-    <div className="game-container">
-      <div className="game-header">
-        <h1>MYSTIC CV ADVENTURE</h1>
-        <p className="controls-hint">Use <strong>W A S D</strong> or <strong>Arrows</strong> to move. Walk to a zone and press <strong>E</strong> or <strong>Enter</strong> to interact.</p>
-      </div>
-
-      <div
-        className="game-world-wrapper"
-        style={{ width: GAME_WIDTH * scale, height: GAME_HEIGHT * scale, position: 'relative' }}
-      >
-        <div
-          className="game-world"
-          style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
-        >
-          {ZONES.map(zone => (
-            <div
-              key={zone.id}
-              className={`zone-sprite zone-${zone.id}`}
-              style={{
-                left: zone.x,
-                top: zone.y,
-                width: zone.w,
-                height: zone.h
-              }}
-            >
-              {zone.label}
-            </div>
-          ))}
-
-          <div
-            className="player-sprite"
-            style={{
-              transform: `translate(${playerPos.x}px, ${playerPos.y}px)`
-            }}
-          >
-            {activeZone && (
-              <div className="interaction-prompt">Press E</div>
-            )}
+          <span className="modal-kicker">ARCHIVE 03 // QUEST LOG</span>
+          <h2>Project Experience</h2>
+          <div className="timeline">
+            {cvData.experiences.map((experience) => (
+              <article key={experience.id} className="timeline-entry">
+                <span className="timeline-period">{experience.period}</span>
+                <h3>{experience.position}</h3>
+                <h4>{experience.company}</h4>
+                <p>{experience.description}</p>
+              </article>
+            ))}
           </div>
         </div>
+      );
+    }
+
+    return (
+      <div>
+        <span className="modal-kicker">ARCHIVE 04 // BUILD VAULT</span>
+        <h2>Selected Projects</h2>
+        {cvData.projects.map((project) => (
+          <article key={project.id} className="project-entry">
+            <div className="project-heading">
+              <div><span>{project.period}</span><h3>{project.title}</h3></div>
+              {project.featured && <strong>FEATURED</strong>}
+            </div>
+            <p>{project.description}</p>
+            {project.role && <p><b>Role:</b> {project.role}</p>}
+            <div className="project-meta">
+              {project.platform && <span>{project.platform}</span>}
+              {project.team && <span>{project.team}</span>}
+            </div>
+            <div className="tag-list">{project.techStack?.map((tech) => <span key={tech} className="tag">{tech}</span>)}</div>
+            <details>
+              <summary>KEY CONTRIBUTIONS ({project.highlights.length})</summary>
+              <ul className="project-highlights">{project.highlights.map((item) => <li key={item}>{item}</li>)}</ul>
+            </details>
+          </article>
+        ))}
+      </div>
+    );
+  };
+
+  const interactionLabel = activeZone ? `OPEN ${activeZone.label}` : nearPortal ? (portalUnlocked ? 'ENTER PORTAL' : 'PORTAL LOCKED') : null;
+
+  return (
+    <main className="game-container">
+      <header className="topbar">
+        <div className="brand-block">
+          <span className="brand-mark" aria-hidden="true">DL</span>
+          <div><h1>LUAN.DEV // MYSTIC ARCHIVE</h1><p>UNITY GAME DEVELOPER</p></div>
+        </div>
+        <div className="hud-progress">
+          <div><span>DATA SHARDS</span><strong>{collectedShardIds.length}/{SHARDS.length}</strong></div>
+          <div className="progress-track"><span style={{ width: `${(collectedShardIds.length / SHARDS.length) * 100}%` }} /></div>
+        </div>
+      </header>
+
+      <div className="game-layout">
+        <section className="world-stage" aria-label="Interactive CV game world">
+          <div className="world-topline"><span>{notice}</span><button type="button" onClick={resetGame}>RESET RUN</button></div>
+          <div className="game-world-wrapper" style={{ width: GAME_WIDTH * scale, height: GAME_HEIGHT * scale }}>
+            <div className="game-world" style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+              <div className="world-atmosphere" aria-hidden="true" />
+              {ZONES.map((zone) => (
+                <button
+                  type="button"
+                  key={zone.id}
+                  className={`zone-sprite zone-${zone.id}${activeZone?.id === zone.id ? ' is-active' : ''}${visitedZoneIds.includes(zone.id) ? ' is-visited' : ''}`}
+                  style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}
+                  onClick={() => openZone(zone.id)}
+                >
+                  <span>{zone.code}</span><strong>{zone.label}</strong>
+                </button>
+              ))}
+
+              <div className={`portal${portalUnlocked ? ' is-unlocked' : ''}${nearPortal ? ' is-near' : ''}`} style={{ left: PORTAL.x, top: PORTAL.y }}>
+                <span>{portalUnlocked ? 'ONLINE' : `${collectedShardIds.length}/${SHARDS.length}`}</span>
+              </div>
+
+              {SHARDS.map((shard) => !collectedShardIds.includes(shard.id) && (
+                <div key={shard.id} className="data-shard" style={{ left: shard.x, top: shard.y }}>
+                  <span>{shard.label}</span>
+                </div>
+              ))}
+
+              <div className="player-sprite" style={{ transform: `translate(${playerPos.x}px, ${playerPos.y}px)` }}>
+                {interactionLabel && <div className="interaction-prompt">{interactionLabel}<kbd>E</kbd></div>}
+                <div className={`player-character facing-${facing}${moving ? ' is-moving' : ''}`} aria-label="Player character">
+                  <span className="player-head" /><span className="player-body" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside className="mission-panel">
+          <div className="panel-heading"><span>ACTIVE QUEST</span><strong>CV-001</strong></div>
+          <h2>Decode the Developer</h2>
+          <p>Recover five tech shards and activate the portal at the heart of the archive.</p>
+          <div className="mission-list">
+            {ZONES.map((zone) => (
+              <button type="button" key={zone.id} onClick={() => openZone(zone.id)}>
+                <span>{zone.code}</span><b>{zone.label}</b><i>{visitedZoneIds.includes(zone.id) ? 'READ' : 'NEW'}</i>
+              </button>
+            ))}
+          </div>
+          <div className={`portal-status${portalUnlocked ? ' is-ready' : ''}`}>
+            <span>FINAL GATE</span><strong>{portalUnlocked ? 'PORTAL READY' : 'ENCRYPTED'}</strong>
+          </div>
+        </aside>
       </div>
 
-      <div className="mobile-controls">
+      <div className="mobile-controls" aria-label="Movement controls">
         <div className="d-pad">
-          <button className="control-btn d-up" onTouchStart={() => handleTouchStart('w')} onTouchEnd={() => handleTouchEnd('w')} onMouseDown={() => handleTouchStart('w')} onMouseUp={() => handleTouchEnd('w')}>↑</button>
-          <button className="control-btn d-left" onTouchStart={() => handleTouchStart('a')} onTouchEnd={() => handleTouchEnd('a')} onMouseDown={() => handleTouchStart('a')} onMouseUp={() => handleTouchEnd('a')}>←</button>
-          <button className="control-btn d-down" onTouchStart={() => handleTouchStart('s')} onTouchEnd={() => handleTouchEnd('s')} onMouseDown={() => handleTouchStart('s')} onMouseUp={() => handleTouchEnd('s')}>↓</button>
-          <button className="control-btn d-right" onTouchStart={() => handleTouchStart('d')} onTouchEnd={() => handleTouchEnd('d')} onMouseDown={() => handleTouchStart('d')} onMouseUp={() => handleTouchEnd('d')}>→</button>
+          <button type="button" className="control-btn d-up" aria-label="Move up" onPointerDown={() => setControl('w', true)} onPointerUp={() => setControl('w', false)} onPointerLeave={() => setControl('w', false)}><span aria-hidden="true">&#8593;</span></button>
+          <button type="button" className="control-btn d-left" aria-label="Move left" onPointerDown={() => setControl('a', true)} onPointerUp={() => setControl('a', false)} onPointerLeave={() => setControl('a', false)}><span aria-hidden="true">&#8592;</span></button>
+          <button type="button" className="control-btn d-down" aria-label="Move down" onPointerDown={() => setControl('s', true)} onPointerUp={() => setControl('s', false)} onPointerLeave={() => setControl('s', false)}><span aria-hidden="true">&#8595;</span></button>
+          <button type="button" className="control-btn d-right" aria-label="Move right" onPointerDown={() => setControl('d', true)} onPointerUp={() => setControl('d', false)} onPointerLeave={() => setControl('d', false)}><span aria-hidden="true">&#8594;</span></button>
         </div>
-        <button className="control-btn action-btn" onTouchStart={() => handleTouchStart('enter')} onTouchEnd={() => handleTouchEnd('enter')} onMouseDown={() => handleTouchStart('enter')} onMouseUp={() => handleTouchEnd('enter')}>E</button>
+        <button type="button" className="control-btn action-btn" aria-label="Interact" onPointerDown={() => setControl('interact', true)} onPointerUp={() => setControl('interact', false)}>E</button>
       </div>
 
       {openedModal && (
-        <div className="modal-overlay" onClick={() => setOpenedModal(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setOpenedModal(null)}>X</button>
-            <div className="modal-body">
-              {renderModalContent()}
-            </div>
-          </div>
+        <div className="modal-overlay" role="presentation" onMouseDown={() => setOpenedModal(null)}>
+          <section className="modal-content" role="dialog" aria-modal="true" aria-label="CV archive" onMouseDown={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="Close archive" onClick={() => setOpenedModal(null)}>X</button>
+            <div className="modal-body">{renderModalContent()}</div>
+          </section>
         </div>
       )}
-    </div>
+    </main>
   );
 }

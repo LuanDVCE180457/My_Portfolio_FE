@@ -13,6 +13,13 @@ npm run dev
 
 Chỉnh dữ liệu tại `src/data/cvData.ts`. Các kiểu dữ liệu tương ứng nằm trong `src/types`.
 
+## Gameplay
+
+- Di chuyển bằng `WASD` hoặc phím mũi tên.
+- Dùng `E`, `Enter` hoặc `Space` để tương tác.
+- Thu thập đủ 5 Data Shards để mở portal trung tâm.
+- Bốn archive trên bản đồ mở nhanh các phần Profile, Skills, Experience và Projects.
+
 ## Kiểm tra bản production
 
 ```bash
