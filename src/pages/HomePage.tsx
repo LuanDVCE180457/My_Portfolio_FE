@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getFullCv } from '../api/cvApi';
+import { cvData } from '../data/cvData';
 
 // Constants for game world
 const GAME_WIDTH = 800;
@@ -26,9 +26,6 @@ const ZONES: Zone[] = [
 ];
 
 export default function HomePage() {
-  const [cvData, setCvData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
   // Game state
   const [playerPos, setPlayerPos] = useState({ x: 380, y: 280 });
   const [activeZone, setActiveZone] = useState<Zone | null>(null);
@@ -42,19 +39,12 @@ export default function HomePage() {
   const activeZoneRef = useRef<Zone | null>(null);
 
   useEffect(() => {
-    getFullCv().then((data) => {
-      setCvData(data);
-      setLoading(false);
-    });
-  }, []);
-
-  useEffect(() => {
     const handleResize = () => {
       // Scale down if screen is smaller than 800px (with some margin)
       const availableWidth = Math.min(window.innerWidth * 0.95, GAME_WIDTH);
       setScale(availableWidth / GAME_WIDTH);
     };
-    
+
     window.addEventListener('resize', handleResize);
     handleResize(); // Init scale
 
@@ -166,17 +156,9 @@ export default function HomePage() {
     return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="game-container">
-        <h1>LOADING GAME WORLD...</h1>
-      </div>
-    );
-  }
-
   // Modals Content
   const renderModalContent = () => {
-    if (!openedModal || !cvData) return null;
+    if (!openedModal) return null;
 
     if (openedModal === 'profile') {
       const { profile } = cvData;
@@ -198,14 +180,14 @@ export default function HomePage() {
       return (
         <div>
           <h2>Tech Stats</h2>
-          {cvData.skills.map((categoryGroup: any, idx: number) => (
-            <div key={idx} className="card">
+          {cvData.skills.map((categoryGroup) => (
+            <div key={categoryGroup.category} className="card">
               <h3>{categoryGroup.category}</h3>
-              {categoryGroup.items.map((s: any, itemIdx: number) => (
-                <div key={itemIdx} className="info-row" style={{ marginTop: '10px' }}>
-                  <span className="info-label" style={{ fontSize: '1.2rem' }}>{s.name}</span>
+              {categoryGroup.items.map((skill) => (
+                <div key={skill.name} className="info-row" style={{ marginTop: '10px' }}>
+                  <span className="info-label" style={{ fontSize: '1.2rem' }}>{skill.name}</span>
                   <div className="skill-item__bar" style={{ marginTop: '5px' }}>
-                    <span style={{ width: `${s.level}%` }}></span>
+                    <span style={{ width: `${skill.level}%` }}></span>
                   </div>
                 </div>
               ))}
@@ -219,11 +201,11 @@ export default function HomePage() {
       return (
         <div>
           <h2>Quest Log (Experience)</h2>
-          {cvData.experiences.map((exp: any) => (
+          {cvData.experiences.map((exp) => (
             <div key={exp.id} className="card">
               <h3>{exp.position}</h3>
               <h4>{exp.company}</h4>
-              <p><strong>Duration:</strong> {new Date(exp.startDate).toLocaleDateString('en-GB')} - {exp.isCurrent ? 'Present' : new Date(exp.endDate).toLocaleDateString('en-GB')}</p>
+              <p><strong>Duration:</strong> {new Date(exp.startDate).toLocaleDateString('en-GB')} - {exp.isCurrent || !exp.endDate ? 'Present' : new Date(exp.endDate).toLocaleDateString('en-GB')}</p>
               <p>{exp.description}</p>
             </div>
           ))}
@@ -235,7 +217,7 @@ export default function HomePage() {
       return (
         <div>
           <h2>Inventory (Projects)</h2>
-          {cvData.projects.map((proj: any) => (
+          {cvData.projects.map((proj) => (
             <div key={proj.id} className="card">
               <h3>{proj.title}</h3>
               <p><strong>Description:</strong> {proj.description}</p>
@@ -261,11 +243,11 @@ export default function HomePage() {
         <p className="controls-hint">Use <strong>W A S D</strong> or <strong>Arrows</strong> to move. Walk to a zone and press <strong>E</strong> or <strong>Enter</strong> to interact.</p>
       </div>
 
-      <div 
-        className="game-world-wrapper" 
+      <div
+        className="game-world-wrapper"
         style={{ width: GAME_WIDTH * scale, height: GAME_HEIGHT * scale, position: 'relative' }}
       >
-        <div 
+        <div
           className="game-world"
           style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
         >

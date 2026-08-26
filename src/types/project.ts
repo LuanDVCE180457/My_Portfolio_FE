@@ -4,10 +4,9 @@ export interface Project {
   slug: string;
   description: string;
   imageUrl?: string | null;
+  role?: string | null;
   projectUrl?: string | null;
   githubUrl?: string | null;
   techStack?: string[] | null;
   featured: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
