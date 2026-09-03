@@ -281,6 +281,7 @@ export default function HomePage() {
             <div className="info-row"><span className="info-label">Email</span><a className="info-value" href={`mailto:${profile.email}`}>{profile.email}</a></div>
             <div className="info-row"><span className="info-label">Location</span><span className="info-value">{profile.location}</span></div>
             <div className="info-row"><span className="info-label">Born</span><span className="info-value">{profile.dob}</span></div>
+            <div className="info-row"><span className="info-label">Gender</span><span className="info-value">{profile.gender}</span></div>
           </div>
           <div className="info-row"><span className="info-label">Objective</span><span className="info-value">{profile.bio}</span></div>
           <div className="info-row"><span className="info-label">Education</span><span className="info-value">{profile.education}</span></div>
@@ -343,6 +344,48 @@ export default function HomePage() {
               {project.team && <span>{project.team}</span>}
             </div>
             <div className="tag-list">{project.techStack?.map((tech) => <span key={tech} className="tag">{tech}</span>)}</div>
+            {project.trailerUrl && (
+              <section className="project-demo project-trailer" aria-label={`${project.title} trailer`}>
+                <div className="project-demo-heading">
+                  <div>
+                    <span>OFFICIAL TRAILER</span>
+                    <h4>Mystic Journey — Game Trailer</h4>
+                  </div>
+                  <a href={project.trailerUrl} download>DOWNLOAD TRAILER</a>
+                </div>
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster="/assets/cv-dungeon-map-v2.jpg"
+                  aria-label="Mystic Journey game trailer"
+                >
+                  <source src={project.trailerUrl} type="video/mp4" />
+                  Your browser does not support HTML video. You can download the trailer using the link above.
+                </video>
+              </section>
+            )}
+            {project.videoUrl && (
+              <section className="project-demo" aria-label={`${project.title} gameplay demo`}>
+                <div className="project-demo-heading">
+                  <div>
+                    <span>GAMEPLAY FOOTAGE</span>
+                    <h4>Mystic Journey — Full Demo</h4>
+                  </div>
+                  <a href={project.videoUrl} download>DOWNLOAD VIDEO</a>
+                </div>
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster="/assets/cv-dungeon-map-v2.jpg"
+                  aria-label="Mystic Journey full gameplay demo"
+                >
+                  <source src={project.videoUrl} type="video/mp4" />
+                  Your browser does not support HTML video. You can download the demo using the link above.
+                </video>
+              </section>
+            )}
             <details>
               <summary>KEY CONTRIBUTIONS ({project.highlights.length})</summary>
               <ul className="project-highlights">{project.highlights.map((item) => <li key={item}>{item}</li>)}</ul>

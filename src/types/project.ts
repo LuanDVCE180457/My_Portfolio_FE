@@ -5,6 +5,8 @@ export interface Project {
   description: string;
   period: string;
   imageUrl?: string | null;
+  trailerUrl?: string | null;
+  videoUrl?: string | null;
   role?: string | null;
   platform?: string | null;
   team?: string | null;

@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Keep the original large recording locally; commit the optimized web version instead.
+public/video/Mystic_Journey_DemoFull.mp4
+.ffmpeg-mystic-full-*
